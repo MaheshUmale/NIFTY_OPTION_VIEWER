@@ -7,6 +7,14 @@ const STORAGE_KEY = 'nse_option_chain_snapshots';
 export const saveSnapshot = (data: NSEResponse): void => {
   try {
     const analysis = analyzeOptionChain(data.records.data, data.records.underlyingValue);
+    
+    // Calculate PCR of Change in OI
+    // Handle division by zero or very small numbers
+    let pcrChangeOI = 0;
+    if (analysis.callChangeOI !== 0) {
+        pcrChangeOI = Number((analysis.putChangeOI / analysis.callChangeOI).toFixed(2));
+    }
+
     const snapshot: Snapshot = {
       id: Date.now().toString(),
       timestamp: data.records.timestamp.includes('T') 
@@ -14,6 +22,7 @@ export const saveSnapshot = (data: NSEResponse): void => {
                  : new Date().toISOString(),
       underlyingValue: data.records.underlyingValue,
       pcr: analysis.pcr,
+      pcrChangeOI, 
       maxPain: analysis.maxPain,
       ceTotalOI: analysis.callOI,
       peTotalOI: analysis.putOI,
@@ -93,12 +102,10 @@ export const fetchOptionChainData = async (symbol: string): Promise<NSEResponse>
     let minutes = now.getMinutes();
 
     // Check if we are after market close (15:30)
-    // Adjust logic as needed. Assuming 15:30 is the cutoff for intraday snapshots.
     if (hours > 15 || (hours === 15 && minutes >= 30)) {
       hours = 15;
       minutes = 30;
     } else if (hours < 9 || (hours === 9 && minutes < 15)) {
-      // Before market open, default to yesterday's close or let API handle it
       hours = 15;
       minutes = 30;
     }

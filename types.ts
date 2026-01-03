@@ -61,6 +61,7 @@ export interface Snapshot {
   timestamp: string;
   underlyingValue: number;
   pcr: number;
+  pcrChangeOI?: number; // PCR of Change in OI
   maxPain: number;
   ceTotalOI: number;
   peTotalOI: number;

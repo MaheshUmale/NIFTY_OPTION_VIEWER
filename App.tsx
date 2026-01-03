@@ -5,6 +5,7 @@ import { fetchOptionChainData, saveSnapshot, getSnapshots, clearSnapshots, saveB
 import { getStockId, getExpiryDates, generateTimeIntervals, fetchTrendlyneSnapshot } from './services/trendlyne';
 import { analyzeOptionChain } from './services/analysis';
 import { OIChart } from './components/OIChart';
+import { PCRChart } from './components/PCRChart';
 
 const App: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(INDICES[0].value);
@@ -81,12 +82,18 @@ const App: React.FC = () => {
         if (response) {
           const resAnalysis = analyzeOptionChain(response.records.data, response.records.underlyingValue);
           
+          let pcrChangeOI = 0;
+          if (resAnalysis.callChangeOI !== 0) {
+              pcrChangeOI = Number((resAnalysis.putChangeOI / resAnalysis.callChangeOI).toFixed(2));
+          }
+
           // Create Snapshot
           newSnapshots.push({
             id: `backfill-${time}-${Date.now()}`,
             timestamp: response.records.timestamp,
             underlyingValue: response.records.underlyingValue,
             pcr: resAnalysis.pcr,
+            pcrChangeOI,
             maxPain: resAnalysis.maxPain,
             ceTotalOI: resAnalysis.callOI,
             peTotalOI: resAnalysis.putOI,
@@ -248,48 +255,60 @@ const App: React.FC = () => {
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+           {/* Main OI Chart */}
            <div className="lg:col-span-2 bg-gray-800 rounded-lg p-4 shadow border border-gray-700">
               <h3 className="text-lg font-medium mb-4 text-gray-300">Open Interest Distribution</h3>
               {data && <OIChart data={data.records.data} atm={atmStrike} />}
            </div>
            
+           {/* New PCR Trend Widget */}
            <div className="bg-gray-800 rounded-lg p-4 shadow border border-gray-700 flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-lg font-medium text-gray-300">Snapshot History</h3>
-                 <button onClick={() => { clearSnapshots(); setHistory([]); }} className="text-xs text-red-400 hover:text-red-300">Clear</button>
+              <h3 className="text-lg font-medium mb-2 text-gray-300">PCR Trend (Today)</h3>
+              <div className="flex-1">
+                 <PCRChart history={history} />
               </div>
-              <div className="flex-1 overflow-y-auto max-h-[300px]">
+           </div>
+        </div>
+
+        {/* Snapshot History Table */}
+        <div className="bg-gray-800 rounded-lg shadow border border-gray-700">
+            <div className="p-4 border-b border-gray-700 flex justify-between">
+                <h3 className="text-lg font-medium text-gray-300">Historical Snapshots</h3>
+                <button onClick={() => { clearSnapshots(); setHistory([]); }} className="text-xs text-red-400 hover:text-red-300">Clear History</button>
+            </div>
+            <div className="overflow-x-auto max-h-[300px]">
                 <table className="w-full text-xs text-left text-gray-400">
                   <thead className="text-gray-200 sticky top-0 bg-gray-800">
                     <tr>
-                      <th className="py-2">Time</th>
-                      <th className="py-2">Spot</th>
-                      <th className="py-2">PCR</th>
-                      <th className="py-2">Max Pain</th>
+                      <th className="py-2 px-4">Time</th>
+                      <th className="py-2 px-4">Spot</th>
+                      <th className="py-2 px-4">PCR (Total)</th>
+                      <th className="py-2 px-4">PCR (Change)</th>
+                      <th className="py-2 px-4">Max Pain</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-700">
                     {history.map((snap) => {
                       const timeStr = snap.timestamp.includes('T') 
                         ? new Date(snap.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                         : snap.timestamp.split(' ')[1] || snap.timestamp;
 
                       return (
-                        <tr key={snap.id} className="border-b border-gray-700 hover:bg-gray-750">
-                          <td className="py-2">{timeStr}</td>
-                          <td className="py-2 text-white">{snap.underlyingValue.toFixed(2)}</td>
-                          <td className={`py-2 ${snap.pcr > 1 ? 'text-green-400' : 'text-red-400'}`}>{snap.pcr}</td>
-                          <td className="py-2">{snap.maxPain}</td>
+                        <tr key={snap.id} className="hover:bg-gray-750">
+                          <td className="py-2 px-4">{timeStr}</td>
+                          <td className="py-2 px-4 text-white">{snap.underlyingValue.toFixed(2)}</td>
+                          <td className={`py-2 px-4 ${snap.pcr > 1 ? 'text-green-400' : 'text-red-400'}`}>{snap.pcr}</td>
+                          <td className="py-2 px-4 text-purple-400">{snap.pcrChangeOI || '-'}</td>
+                          <td className="py-2 px-4">{snap.maxPain}</td>
                         </tr>
                       );
                     })}
                     {history.length === 0 && (
-                      <tr><td colSpan={4} className="py-4 text-center italic">No history yet</td></tr>
+                      <tr><td colSpan={5} className="py-4 text-center italic">No history yet. Click Backfill to load today's data.</td></tr>
                     )}
                   </tbody>
                 </table>
-              </div>
-           </div>
+            </div>
         </div>
 
         {/* Option Chain Table */}
