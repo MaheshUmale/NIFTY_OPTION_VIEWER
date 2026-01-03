@@ -1,0 +1,5 @@
+{
+  "name": "NSE Option Chain Analyzer",
+  "description": "A web-based NSE Option Chain Analyzer to track Open Interest, PCR, and Max Pain in real-time. Features interactive charts, local data persistence, and JSON export.",
+  "requestFramePermissions": []
+}
